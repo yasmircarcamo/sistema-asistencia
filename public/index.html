@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Control de Asistencia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 font-sans antialiased text-gray-800 min-h-screen">
+
+  <!-- PANTALLA 1: LOGIN -->
+  <div id="view-login" class="flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-200">
+      <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-blue-600">AsistenciaApp</h1>
+        <p class="text-gray-500 text-sm">Ingresa con tus credenciales de acceso</p>
+      </div>
+      <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Usuario</label>
+          <input type="text" id="login-user" value="admin" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+          <input type="password" id="login-pass" value="admin123" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <p id="login-error" class="text-red-500 text-xs hidden">Credenciales incorrectas.</p>
+        <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">Iniciar Sesión</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- APLICACIÓN PRINCIPAL (Sidebar + Contenido) -->
+  <div id="app-shell" class="hidden flex min-h-screen">
+    <!-- Sidebar / Menú Principal -->
+    <aside class="w-64 bg-slate-900 text-slate-100 flex flex-col justify-between">
+      <div>
+        <div class="p-6 border-b border-slate-800">
+          <h2 class="text-xl font-bold text-blue-400">AsistenciaApp</h2>
+          <p id="user-display" class="text-xs text-slate-400 mt-1">Usuario: Admin</p>
+        </div>
+        <nav class="p-4 space-y-2">
+          <button onclick="navigate('dashboard')" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition">Dashboard</button>
+          <button onclick="navigate('employees')" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition">Empleados (Registro/Edit)</button>
+          <button onclick="navigate('attendance')" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition">Consultar Asistencias</button>
+          <button onclick="navigate('mark')" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition">Marcaje Rápido</button>
+          <button onclick="navigate('reports')" class="w-full text-left px-4 py-2.5 rounded-lg hover:bg-slate-800 font-medium transition">Reportes</button>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-slate-800">
+        <button onclick="logout()" class="w-full bg-red-600/20 text-red-400 hover:bg-red-600/30 py-2 rounded-lg text-sm font-semibold transition">Cerrar Sesión</button>
+      </div>
+    </aside>
+
+    <!-- ÁREA DE CONTENIDO DINÁMICO -->
+    <main class="flex-1 p-8 overflow-y-auto">
+
+      <!-- PANTALLA 2: DASHBOARD -->
+      <section id="view-dashboard" class="space-y-6">
+        <h2 class="text-2xl font-bold">Resumen de Asistencia Hoy</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <span class="text-sm text-gray-500">Total Empleados</span>
+            <div id="kpi-total" class="text-3xl font-bold text-slate-800 mt-1">0</div>
+          </div>
+          <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <span class="text-sm text-green-600 font-medium">Puntuales Hoy</span>
+            <div id="kpi-puntuales" class="text-3xl font-bold text-green-600 mt-1">0</div>
+          </div>
+          <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <span class="text-sm text-amber-600 font-medium">Retardos Hoy</span>
+            <div id="kpi-retardos" class="text-3xl font-bold text-amber-600 mt-1">0</div>
+          </div>
+          <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+            <span class="text-sm text-red-600 font-medium">Faltas Hoy</span>
+            <div id="kpi-faltas" class="text-3xl font-bold text-red-600 mt-1">0</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANTALLA 3 Y 4: EMPLEADOS (REGISTRO Y EDICIÓN) -->
+      <section id="view-employees" class="space-y-6 hidden">
+        <div class="flex justify-between items-center">
+          <h2 class="text-2xl font-bold">Gestión de Empleados</h2>
+          <button onclick="openEmployeeModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">+ Nuevo Empleado</button>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 text-gray-600 border-b">
+              <tr>
+                <th class="p-4">Código</th>
+                <th class="p-4">Nombre</th>
+                <th class="p-4">Departamento</th>
+                <th class="p-4">Puesto</th>
+                <th class="p-4">Estado</th>
+                <th class="p-4 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="employee-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PANTALLA 5: CONSULTA DE ASISTENCIAS -->
+      <section id="view-attendance" class="space-y-6 hidden">
+        <h2 class="text-2xl font-bold">Consulta de Asistencias</h2>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 text-gray-600 border-b">
+              <tr>
+                <th class="p-4">Fecha</th>
+                <th class="p-4">Código</th>
+                <th class="p-4">Empleado</th>
+                <th class="p-4">Entrada</th>
+                <th class="p-4">Salida</th>
+                <th class="p-4">Estado</th>
+              </tr>
+            </thead>
+            <tbody id="attendance-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PANTALLA MARCAJE RÁPIDO (SIMULADOR DE CHECADOR) -->
+      <section id="view-mark" class="space-y-6 hidden">
+        <h2 class="text-2xl font-bold">Terminal de Marcaje de Asistencia</h2>
+        <div class="max-w-md bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Código de Empleado</label>
+            <input type="text" id="mark-code" placeholder="Ej. EMP001" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase">
+          </div>
+          <div class="flex space-x-3">
+            <button onclick="submitMark('entrada')" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700">Marcar Entrada</button>
+            <button onclick="submitMark('salida')" class="flex-1 bg-amber-600 text-white py-2 rounded-lg font-medium hover:bg-amber-700">Marcar Salida</button>
+          </div>
+          <p id="mark-msg" class="text-sm font-medium mt-2"></p>
+        </div>
+      </section>
+
+      <!-- PANTALLA 6: REPORTES -->
+      <section id="view-reports" class="space-y-6 hidden">
+        <h2 class="text-2xl font-bold">Reportes de Asistencia</h2>
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-xl">
+          <h3 class="text-lg font-semibold mb-4">Puntualidad del Día</h3>
+          <canvas id="reportChart" height="200"></canvas>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL DE FORMULARIO DE REGISTRO / MODIFICACIÓN -->
+  <div id="emp-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+      <h3 id="modal-title" class="text-lg font-bold">Registrar Empleado</h3>
+      <form id="emp-form" onsubmit="saveEmployee(event)" class="space-y-3">
+        <input type="hidden" id="emp-id">
+        <div>
+          <label class="block text-xs font-medium text-gray-700">Código</label>
+          <input type="text" id="emp-code" required class="w-full px-3 py-1.5 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700">Nombre Completo</label>
+          <input type="text" id="emp-name" required class="w-full px-3 py-1.5 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700">Departamento</label>
+          <input type="text" id="emp-dept" required class="w-full px-3 py-1.5 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700">Puesto</label>
+          <input type="text" id="emp-puesto" required class="w-full px-3 py-1.5 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700">Estado</label>
+          <select id="emp-status" class="w-full px-3 py-1.5 border rounded-lg">
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeEmployeeModal()" class="px-4 py-2 border text-sm rounded-lg">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let chartInstance = null;
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById('login-user').value;
+      const p = document.getElementById('login-pass').value;
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('view-login').classList.add('hidden');
+        document.getElementById('app-shell').classList.remove('hidden');
+        document.getElementById('user-display').innerText = `Usuario: ${data.user.nombre}`;
+        navigate('dashboard');
+      } else {
+        document.getElementById('login-error').classList.remove('hidden');
+      }
+    }
+
+    function logout() {
+      document.getElementById('app-shell').classList.add('hidden');
+      document.getElementById('view-login').classList.remove('hidden');
+    }
+
+    function navigate(view) {
+      ['dashboard', 'employees', 'attendance', 'mark', 'reports'].forEach(v => {
+        document.getElementById(`view-${v}`).classList.add('hidden');
+      });
+      document.getElementById(`view-${view}`).classList.remove('hidden');
+
+      if (view === 'dashboard') loadDashboard();
+      if (view === 'employees') loadEmployees();
+      if (view === 'attendance') loadAttendance();
+      if (view === 'reports') loadReports();
+    }
+
+    async function loadDashboard() {
+      const res = await fetch('/api/dashboard/stats');
+      const data = await res.json();
+      document.getElementById('kpi-total').innerText = data.totalEmpleados;
+      document.getElementById('kpi-puntuales').innerText = data.puntuales;
+      document.getElementById('kpi-retardos').innerText = data.retardos;
+      document.getElementById('kpi-faltas').innerText = data.faltas;
+    }
+
+    async function loadEmployees() {
+      const res = await fetch('/api/employees');
+      const emps = await res.json();
+      const tbody = document.getElementById('employee-table-body');
+      tbody.innerHTML = emps.map(e => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-4 font-mono text-xs">${e.codigo}</td>
+          <td class="p-4 font-medium">${e.nombre}</td>
+          <td class="p-4">${e.departamento}</td>
+          <td class="p-4">${e.puesto}</td>
+          <td class="p-4"><span class="px-2 py-1 text-xs rounded-full ${e.estado === 'Activo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${e.estado}</span></td>
+          <td class="p-4 text-right">
+            <button onclick='editEmployee(${JSON.stringify(e)})' class="text-blue-600 hover:underline text-xs">Editar</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openEmployeeModal() {
+      document.getElementById('modal-title').innerText = 'Registrar Empleado';
+      document.getElementById('emp-id').value = '';
+      document.getElementById('emp-code').value = '';
+      document.getElementById('emp-name').value = '';
+      document.getElementById('emp-dept').value = '';
+      document.getElementById('emp-puesto').value = '';
+      document.getElementById('emp-status').value = 'Activo';
+      document.getElementById('emp-modal').classList.remove('hidden');
+    }
+
+    function closeEmployeeModal() {
+      document.getElementById('emp-modal').classList.add('hidden');
+    }
+
+    function editEmployee(emp) {
+      document.getElementById('modal-title').innerText = 'Modificar Empleado';
+      document.getElementById('emp-id').value = emp.id;
+      document.getElementById('emp-code').value = emp.codigo;
+      document.getElementById('emp-name').value = emp.nombre;
+      document.getElementById('emp-dept').value = emp.departamento;
+      document.getElementById('emp-puesto').value = emp.puesto;
+      document.getElementById('emp-status').value = emp.estado;
+      document.getElementById('emp-modal').classList.remove('hidden');
+    }
+
+    async function saveEmployee(e) {
+      e.preventDefault();
+      const id = document.getElementById('emp-id').value;
+      const payload = {
+        codigo: document.getElementById('emp-code').value,
+        nombre: document.getElementById('emp-name').value,
+        departamento: document.getElementById('emp-dept').value,
+        puesto: document.getElementById('emp-puesto').value,
+        estado: document.getElementById('emp-status').value
+      };
+
+      const url = id ? `/api/employees/${id}` : '/api/employees';
+      const method = id ? 'PUT' : 'POST';
+
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      closeEmployeeModal();
+      loadEmployees();
+    }
+
+    async function loadAttendance() {
+      const res = await fetch('/api/attendance');
+      const records = await res.json();
+      const tbody = document.getElementById('attendance-table-body');
+      tbody.innerHTML = records.map(r => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="p-4">${r.fecha}</td>
+          <td class="p-4 font-mono text-xs">${r.codigo}</td>
+          <td class="p-4 font-medium">${r.nombre}</td>
+          <td class="p-4 text-green-600">${r.hora_entrada || '-'}</td>
+          <td class="p-4 text-amber-600">${r.hora_salida || '-'}</td>
+          <td class="p-4"><span class="px-2 py-1 text-xs rounded-full bg-gray-100">${r.estado}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function submitMark(tipo) {
+      const codigo = document.getElementById('mark-code').value;
+      const msg = document.getElementById('mark-msg');
+      const res = await fetch('/api/attendance/mark', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigo, tipo })
+      });
+      const data = await res.json();
+      msg.innerText = data.message;
+      msg.className = `text-sm font-medium mt-2 ${data.success ? 'text-green-600' : 'text-red-600'}`;
+      if (data.success) document.getElementById('mark-code').value = '';
+    }
+
+    async function loadReports() {
+      const res = await fetch('/api/dashboard/stats');
+      const data = await res.json();
+
+      const ctx = document.getElementById('reportChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Puntuales', 'Retardos', 'Faltas'],
+          datasets: [{
+            data: [data.puntuales, data.retardos, data.faltas],
+            backgroundColor: ['#16a34a', '#d97706', '#dc2626']
+          }]
+        }
+      });
+    }
+  </script>
+</body>
+</html>
